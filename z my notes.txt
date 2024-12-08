@@ -1,0 +1,113 @@
+AWS Project: Build a Resume/CV on AWS, Step-by-Step Tutorial to Help You Get Hired
+https://www.youtube.com/watch?v=NiCZSdWucZE&list=PLwyXYwu8kL0wMalR9iXJIPfiMYWNFWQzx&index=4
+
+					build a webpage ---> S3 ---> route53 ---> ACM ---> Cloudfront
+					
+					S3 = host the webpage
+					route 53 = register a domain name to host webpage
+					ACM = secure connection ( you cannot apply this to S3 bucket, you must apply this to a cloudfront distribution)
+					Cloudfront = work with ACM
+					
+-----------------------------------------------------------------
+					
+1) create resume webpage:
+					ask chatgpt do it for you.
+									"i want to create an online resume for myself. it should be  a single webpage that uses HTML, JS and CSS. it should display a headshot image, and have placeholders for name, contact information, employment history, education and skills/certifications. JS should be used to make the employment timeline interactive. i would like the HTML, CSS, JS code to be in separate files, can you create the code for this page?"
+									
+									
+2) push html,css, js code to S3:
+					goto S3 create a new bucket
+					**Important!!!, if you will use Route53 to direct traffic to your S3, the S3 bucket name "MUST SAME AS YOUR DOMAIN NAME", eg bucket name = carichung.com, do NOT random assign a bucket name otherwise the connection will be fail.
+					
+													***********************************
+												    GPT:
+													Allowing public access directly to an Amazon S3 bucket for hosting a resume or any sensitive information is generally not recommended due to security and privacy concerns. Here are a few reasons why using Amazon Route 53 to redirect traffic to your S3 bucket is a better approach:
+
+													Security: By default, S3 buckets are private and can only be accessed by authorized users. Directly exposing your S3 bucket to the public could potentially lead to unauthorized access, data breaches, or unwanted exposure of your resume.
+													Control: By using Route 53 for redirection, you have more control over the access to your resume. You can configure Route 53 to redirect traffic to your S3 bucket securely, ensuring that only the intended audience can view your resume.
+													Custom Domain: Using Route 53 allows you to use a custom domain name for your resume, making it easier to share and remember. It also provides a more professional appearance compared to sharing an S3 bucket URL.
+													Scalability: Route 53 provides features like DNS routing and health checks, which can help manage traffic efficiently, especially if you expect high volumes of visitors to access your resume.
+													Logging and Monitoring: Route 53 provides detailed logging and monitoring capabilities, which can be useful for tracking access to your resume and identifying potential issues.
+													In summary, while it is technically possible to make an S3 bucket public and share your resume directly from there, using Amazon Route 53 to redirect traffic to your S3 bucket offers better security, control, customization, and scalability options for sharing your resume with the public.
+													***********************************
+													
+					for bucket name, input "carichung.com" 
+					AWS region, choose the us-east-1
+					remove the check for "block all public access"
+					click "create bucket"
+					goto "Properties", scroll down and you should find a URL for the webpage
+					the webpage is still in insecure state
+					
+3) work on domain name in Route53:
+
+					goto Route53 ( **i have bought a domain name)
+									**Hosted zone = a container for different records and rules to handle traffic from internet
+					
+					you want if someone goto carichung.com, aws will route that request to S3 webpage:
+									click "create record"
+									for record name, keep it as carichung.com
+									for record type, use "A record"
+									enable the "Alias" button
+													**"Alias" let us route to aws resources such as S3/cloudfront/elastic beanstalk etc 
+									for "route traffic to", choose S3
+									for "region", choose "us-east-1"
+									for "S3 endpoint", choose "carichung.com"
+													**if your bucket name not auto show, is bcoz you didnt use your domain name as bucket name
+									click "create record"
+									click the "view status" button on top
+									wait for the status change to "IN SYNC" otherwise the webpage will not display (!!! LONG WAIT, 20min+)
+									goto "carichung.com", it should show the webpage
+									
+4) setting up certificate in Certificate Manager (ACM) : ( you cannot use this certificate in S3, you must use with cloudfront)
+
+						goto AWS ACM (certificate manager)
+						**Important!!!, the region MUST BE in us-east-1 !!! (if you create a certificate in other region, it wont work)
+						click "request a certificate"
+						click "request public certificate" --> next
+						for "fully qualified domain name", input "carichung.com" 
+						click "request"
+						click "view certificate" on top
+						in "Domains", click "create records in Route53"
+						click "create records" (**this will create a new "C name" record for us, you will also see this in Route53)
+						go back to ACM, wait till the status change to "Issued"
+						
+5) create CloudFront distributi	on:
+
+						click "create CloudFront distribution"
+						for "origin domain" , choose "S3" (**this is where your files are?)
+						it will appear a box with "use website endpoint", click it (**so you can use the website endpoint i/o bucket endpoint)
+						scroll down to "Default cache behavior", select "redirect HTTP to HTTPS"
+						scroll down to "WAF", select "do not enable security protections"
+						scroll down to "Settings", click "Add item", input "carichung.com"
+						in "custom SSL certificate", choose the certificate you just create    ----> **this is how the ACM certificate attached to CloudFront
+						in "default root object", input "index.html"
+						click "create distribution"
+						in the details page, wait till the "Last Modified" change to date and timeline
+						click the URL under "distribution domain name", the webpage should show
+						
+6) goto Route53 to update the final domain name:
+
+						goto Route53
+						select the "A record" you create earlier
+						click "edit record"
+						(**was point to the S3, now we want change to point to CloudFront)
+						for "route traffic to", change to "Alias to CloudFront distribution"
+						there is another empty box below show "choose distribution", choose the "carichung.com"
+						click "save"
+						click the "view status" button at top
+						wait till the status change to "IN SYNC"o 
+						goto "carichung.com, webpage should display with https:// with secure connection
+						
+--------------------------------------------------
+
+7) how to shut down the resources:
+
+						cloudfront :
+												select the distribution, click "disable", then "delete (wait till the last modify change to date & time)
+												
+						Route53:
+												in hosted zone, select the A record  and C record only and click "delete", do not delete the NS and SOA
+												
+						ACM:
+												cannot delete ACM until the cloudfront is deleted
+						
