@@ -1,5 +1,4 @@
-AWS Project: Build a Resume/CV on AWS, Step-by-Step Tutorial to Help You Get Hired
-https://www.youtube.com/watch?v=NiCZSdWucZE&list=PLwyXYwu8kL0wMalR9iXJIPfiMYWNFWQzx&index=4
+
 
 					build a webpage ---> S3 ---> route53 ---> ACM ---> Cloudfront
 					
